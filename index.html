@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Larva weight – power analysis</title>
+<style>
+  :root{
+    --bg:#f6f5f1; --card:#ffffff; --ink:#1f2328; --muted:#5d6670; --line:#e2e0d9;
+    --accent:#2f6f5e; --accent-soft:#e3efe9; --warn:#a15c00; --c2:#b5651d; --c3:#5b5fa8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{max-width:1000px;margin:0 auto;padding:32px 20px 8px}
+  h1{font-size:1.7rem;margin:0 0 6px;letter-spacing:-.01em}
+  header p{margin:0;color:var(--muted);max-width:70ch}
+  main{max-width:1000px;margin:0 auto;padding:12px 20px 60px;display:grid;gap:18px;
+    grid-template-columns:minmax(0,1fr) minmax(0,1.35fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .full{grid-column:1/-1}
+  h2{font-size:1.05rem;margin:0 0 14px}
+  label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+  .field{margin-bottom:14px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  input,select,textarea{width:100%;font:inherit;padding:8px 10px;border:1px solid #cfccc3;border-radius:8px;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+  textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;min-height:84px}
+  button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+  button.secondary{background:#fff;color:var(--accent)}
+  details{margin-top:4px}
+  summary{cursor:pointer;color:var(--accent);font-size:.9rem}
+  .hint{font-size:.8rem;color:var(--muted);margin-top:4px}
+  .big{font-size:2.3rem;font-weight:700;color:var(--accent);line-height:1.1;margin:4px 0}
+  .headline{background:var(--accent-soft);border-radius:10px;padding:16px;margin-bottom:16px}
+  .headline p{margin:0}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .stat{border:1px solid var(--line);border-radius:10px;padding:10px}
+  .stat .k{font-size:.75rem;color:var(--muted)}
+  .stat .v{font-size:1.15rem;font-weight:650}
+  table{width:100%;border-collapse:collapse;font-size:.9rem;font-variant-numeric:tabular-nums}
+  th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  th{font-weight:600;color:var(--muted);font-size:.8rem}
+  tr.current td{background:var(--accent-soft);font-weight:650}
+  .means{display:flex;gap:8px;flex-wrap:wrap}
+  .mean{flex:1;min-width:90px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center}
+  .mean .k{font-size:.75rem;color:var(--muted)}
+  .mean .v{font-weight:650;font-variant-numeric:tabular-nums}
+  canvas{width:100%;height:320px;display:block}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--muted);margin-top:8px}
+  .legend span::before{content:"";display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle;background:var(--c)}
+  .warn{color:var(--warn);font-size:.85rem}
+  .notes{font-size:.92rem;color:#333}
+  .notes li{margin-bottom:6px}
+  .inline-result{font-size:1.05rem;margin-top:6px}
+  .inline-result b{color:var(--accent)}
+  @media (max-width:820px){main{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>How big a weight difference can my larva experiment detect?</h1>
+  <p>Power analysis for comparing mean larval weight between groups with a one-way ANOVA
+     (plus Bonferroni-corrected pairwise tests). Change any value and every result updates.</p>
+</header>
+
+<main>
+  <!-- INPUTS -->
+  <section class="card">
+    <h2>1 · Your design</h2>
+    <div class="row">
+      <div class="field">
+        <label for="k">Number of groups</label>
+        <input id="k" type="number" min="2" max="12" step="1" value="3">
+      </div>
+      <div class="field">
+        <label for="n">Larvae per group</label>
+        <input id="n" type="number" min="2" max="1000" step="1" value="8">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="sd">Standard deviation of weight (within a group)</label>
+        <input id="sd" type="number" min="0" step="any" value="2">
+      </div>
+      <div class="field">
+        <label for="unit">Unit</label>
+        <input id="unit" type="text" value="mg">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="mean">Mean weight of control group (optional, for %)</label>
+      <input id="mean" type="number" min="0" step="any" value="20">
+      <div class="hint">The SD and mean above are example values – replace them with your own (pilot data or literature).</div>
+    </div>
+
+    <details>
+      <summary>Don't know the SD? Paste pilot weights</summary>
+      <div class="field" style="margin-top:10px">
+        <label for="pilot">One group per line, values separated by spaces, commas or semicolons. First line = control.</label>
+        <textarea id="pilot" placeholder="18.2 21.0 19.5 22.3 17.8 20.1&#10;23.1 24.0 21.7 25.2 22.8 23.9"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <button id="usePilot" type="button">Use pooled SD</button>
+          <span id="pilotMsg" class="hint"></span>
+        </div>
+      </div>
+    </details>
+
+    <div class="row" style="margin-top:14px">
+      <div class="field">
+        <label for="alpha">Significance level α</label>
+        <select id="alpha">
+          <option value="0.05" selected>0.05</option>
+          <option value="0.01">0.01</option>
+          <option value="0.10">0.10</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="power">Desired power</label>
+        <select id="power">
+          <option value="0.80" selected>80 %</option>
+          <option value="0.90">90 %</option>
+          <option value="0.95">95 %</option>
+          <option value="0.70">70 %</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="pattern">How do you expect the groups to differ?</label>
+      <select id="pattern">
+        <option value="one" selected>One group differs, the others are equal</option>
+        <option value="even">Evenly spaced (e.g. dose–response)</option>
+        <option value="extreme">Two extreme groups, the rest in the middle (hardest case)</option>
+      </select>
+      <div class="hint">“Difference” on this page always means the gap between the lightest and heaviest group mean.</div>
+    </div>
+  </section>
+
+  <!-- MAIN RESULT -->
+  <section class="card">
+    <h2>2 · Smallest difference you can reliably detect</h2>
+    <div class="headline">
+      <p>With <b id="hDesign"></b>, the group means must differ by at least</p>
+      <div class="big" id="hD">–</div>
+      <p id="hSub"></p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">Difference in SD units (Cohen's d)</div><div class="v" id="sD">–</div></div>
+      <div class="stat"><div class="k">ANOVA effect size f</div><div class="v" id="sF">–</div></div>
+      <div class="stat"><div class="k">Pairwise test, Bonferroni</div><div class="v" id="sPair">–</div></div>
+    </div>
+
+    <label>Example group means that would just reach the target power</label>
+    <div class="means" id="means"></div>
+    <p class="hint" id="pairHint" style="margin-top:12px"></p>
+  </section>
+
+  <!-- POWER CURVE -->
+  <section class="card full">
+    <h2>3 · Power curve – chance of a significant result for each true difference</h2>
+    <canvas id="chart"></canvas>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- CHECK A DIFFERENCE -->
+  <section class="card">
+    <h2>4 · Check a specific difference</h2>
+    <div class="field">
+      <label for="checkD">Expected difference between lightest and heaviest group (<span class="unitLbl">mg</span>)</label>
+      <input id="checkD" type="number" min="0" step="any" value="3">
+    </div>
+    <div class="inline-result" id="checkPow"></div>
+    <div class="inline-result" id="checkN"></div>
+  </section>
+
+  <!-- TABLE -->
+  <section class="card">
+    <h2>5 · What if I use more larvae?</h2>
+    <table>
+      <thead><tr><th>Larvae / group</th><th>Total</th><th>Min. difference (ANOVA)</th><th>% of mean</th><th>Min. diff. (pairwise)</th></tr></thead>
+      <tbody id="tbl"></tbody>
+    </table>
+  </section>
+
+  <!-- NOTES -->
+  <section class="card full notes">
+    <h2>How this works &amp; caveats</h2>
+    <ul>
+      <li><b>Test assumed:</b> one-way ANOVA on weight, groups of equal size, normally distributed weights with the same SD in every group. Power is computed exactly from the noncentral F distribution (same method as G*Power).</li>
+      <li><b>Effect size:</b> Cohen's <i>f</i> = SD of the group means ÷ within-group SD. The “pattern” setting converts <i>f</i> into an actual max–min weight difference.</li>
+      <li><b>Pairwise column:</b> the smallest difference between two specific groups that a post-hoc t-test (pooled error from the ANOVA, Bonferroni-corrected α) detects with the chosen power. Tukey's test needs roughly similar differences.</li>
+      <li><b>The SD drives everything.</b> Halving the SD halves the detectable difference; doubling the sample size only shrinks it by about 30 %. Reducing variation (same instar, same age, same weighing time) is often the cheapest way to gain power.</li>
+      <li>If you plan a non-parametric test (Kruskal–Wallis), expect to need about 15 % more larvae for the same power.</li>
+      <li>Larvae that die or pupate early reduce <i>n</i> – plan a few extra per group.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+/* ---------- Distribution functions ---------- */
+function lgamma(x){
+  const g=7,c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+    -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(x<0.5) return Math.log(Math.PI/Math.abs(Math.sin(Math.PI*x)))-lgamma(1-x);
+  x-=1; let a=c[0]; const t=x+g+0.5;
+  for(let i=1;i<9;i++) a+=c[i]/(x+i);
+  return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a);
+}
+function betacf(a,b,x){
+  const MAXIT=500,EPS=1e-15,FPMIN=1e-300;
+  const qab=a+b,qap=a+1,qam=a-1;
+  let c=1,d=1-qab*x/qap; if(Math.abs(d)<FPMIN)d=FPMIN; d=1/d; let h=d;
+  for(let m=1;m<=MAXIT;m++){
+    const m2=2*m;
+    let aa=m*(b-m)*x/((qam+m2)*(a+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN; c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+    d=1/d; h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN; c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+    d=1/d; const del=d*c; h*=del;
+    if(Math.abs(del-1)<EPS) break;
+  }
+  return h;
+}
+function ibeta(x,a,b){ // regularized incomplete beta I_x(a,b)
+  if(x<=0) return 0; if(x>=1) return 1;
+  const bt=Math.exp(lgamma(a+b)-lgamma(a)-lgamma(b)+a*Math.log(x)+b*Math.log(1-x));
+  if(x<(a+1)/(a+b+2)) return bt*betacf(a,b,x)/a;
+  return 1-bt*betacf(b,a,1-x)/b;
+}
+function fcdf(f,d1,d2){ if(f<=0) return 0; return ibeta(d1*f/(d1*f+d2),d1/2,d2/2); }
+const finvCache=new Map();
+function finv(p,d1,d2){
+  const key=p+"|"+d1+"|"+d2; if(finvCache.has(key)) return finvCache.get(key);
+  let lo=0,hi=1; while(fcdf(hi,d1,d2)<p) hi*=2;
+  for(let i=0;i<100;i++){ const mid=(lo+hi)/2; if(fcdf(mid,d1,d2)<p) lo=mid; else hi=mid; }
+  const r=(lo+hi)/2; finvCache.set(key,r); return r;
+}
+function ncfcdf(f,d1,d2,lam){ // noncentral F CDF as Poisson mixture
+  if(lam<=0) return fcdf(f,d1,d2);
+  const x=d1*f/(d1*f+d2), h=lam/2;
+  const jmax=Math.ceil(h+12*Math.sqrt(h)+30);
+  let s=0;
+  for(let j=0;j<=jmax;j++){
+    const w=Math.exp(-h+j*Math.log(h)-lgamma(j+1));
+    if(w<1e-16 && j>h) break;
+    s+=w*ibeta(x,d1/2+j,d2/2);
+  }
+  return Math.min(1,s);
+}
+function powerF(lam,d1,d2,alpha){ return 1-ncfcdf(finv(1-alpha,d1,d2),d1,d2,lam); }
+function solveLambda(d1,d2,alpha,target){
+  let lo=0,hi=1; while(powerF(hi,d1,d2,alpha)<target && hi<1e6) hi*=2;
+  for(let i=0;i<60;i++){ const mid=(lo+hi)/2; if(powerF(mid,d1,d2,alpha)<target) lo=mid; else hi=mid; }
+  return (lo+hi)/2;
+}
+
+/* ---------- Design helpers ---------- */
+// SD of group means = c * D  (D = max - min difference)
+function patternFactor(p,k){
+  if(p==="one") return Math.sqrt(k-1)/k;
+  if(p==="extreme") return Math.sqrt(1/(2*k));
+  return Math.sqrt((k*k-1)/12)/(k-1); // evenly spaced
+}
+function exampleMeans(p,k,M,D){
+  const out=[];
+  for(let i=0;i<k;i++){
+    if(p==="one") out.push(i===k-1?M+D:M);
+    else if(p==="extreme") out.push(i===0?M:(i===k-1?M+D:M+D/2));
+    else out.push(M+i*D/(k-1));
+  }
+  return out;
+}
+// minimum detectable max-min difference for ANOVA
+function minD_anova(k,n,sd,alpha,pw,pat){
+  const lam=solveLambda(k-1,k*n-k,alpha,pw);
+  const f=Math.sqrt(lam/(k*n));
+  return {f, D:f*sd/patternFactor(pat,k)};
+}
+// minimum detectable difference for one Bonferroni pairwise comparison (pooled df)
+function minD_pair(k,n,sd,alpha,pw){
+  const m=k*(k-1)/2;
+  const lam=solveLambda(1,k*n-k,alpha/m,pw);
+  return sd*Math.sqrt(2*lam/n);
+}
+function powerForD(k,n,sd,alpha,pat,D){
+  const f=patternFactor(pat,k)*D/sd;
+  return powerF(f*f*k*n,k-1,k*n-k,alpha);
+}
+function nNeeded(k,sd,alpha,pw,pat,D){
+  if(D<=0) return Infinity;
+  if(powerForD(k,2000,sd,alpha,pat,D)<pw) return Infinity;
+  let lo=2,hi=2000;
+  if(powerForD(k,2,sd,alpha,pat,D)>=pw) return 2;
+  while(hi-lo>1){ const mid=Math.floor((lo+hi)/2); if(powerForD(k,mid,sd,alpha,pat,D)>=pw) hi=mid; else lo=mid; }
+  return hi;
+}
+
+/* ---------- UI ---------- */
+const $=id=>document.getElementById(id);
+function fmt(x,d=2){ if(!isFinite(x)) return "–"; return x.toLocaleString(undefined,{maximumFractionDigits:d,minimumFractionDigits:d}); }
+function sig(x){ if(!isFinite(x)) return "–"; const a=Math.abs(x); return fmt(x, a>=100?0:a>=10?1:2); }
+function readInputs(){
+  return {
+    k:Math.max(2,Math.min(12,Math.round(+$("k").value||3))),
+    n:Math.max(2,Math.min(1000,Math.round(+$("n").value||8))),
+    sd:+$("sd").value, mean:+$("mean").value,
+    unit:$("unit").value.trim(),
+    alpha:+$("alpha").value, pw:+$("power").value,
+    pat:$("pattern").value
+  };
+}
+const patternText={one:"one group and the others",even:"the lightest and heaviest group (evenly spaced)",extreme:"the lightest and heaviest group"};
+
+function update(){
+  const I=readInputs(), u=I.unit?(" "+I.unit):"";
+  document.querySelectorAll(".unitLbl").forEach(e=>e.textContent=I.unit||"units");
+  if(!(I.sd>0)){ $("hD").textContent="–"; $("hSub").innerHTML='<span class="warn">Enter a standard deviation greater than 0.</span>'; return; }
+
+  const A=minD_anova(I.k,I.n,I.sd,I.alpha,I.pw,I.pat);
+  const P=minD_pair(I.k,I.n,I.sd,I.alpha,I.pw);
+  const hasMean=I.mean>0;
+
+  $("hDesign").textContent=`${I.k} groups × ${I.n} larvae`;
+  $("hD").textContent=sig(A.D)+u;
+  $("hSub").innerHTML=`between ${patternText[I.pat]}${hasMean?` (≈ ${fmt(100*A.D/I.mean,1)} % of the control mean)`:""}
+    to get a significant ANOVA (p &lt; ${I.alpha}) in ${Math.round(I.pw*100)} % of experiments.`;
+  $("sD").textContent=fmt(A.D/I.sd,2);
+  $("sF").textContent=fmt(A.f,3);
+  $("sPair").textContent=sig(P)+u;
+  $("pairHint").innerHTML=`To show that two <i>specific</i> groups differ in a post-hoc test
+    (α = ${I.alpha}/${I.k*(I.k-1)/2} Bonferroni), they need to be about <b>${sig(P)}${u}</b> apart
+    ${hasMean?`(${fmt(100*P/I.mean,1)} % of the control mean)`:""}.`;
+
+  const M=hasMean?I.mean:0;
+  $("means").innerHTML=exampleMeans(I.pat,I.k,M,A.D).map((v,i)=>
+    `<div class="mean"><div class="k">${i===0?"Group 1 (control)":"Group "+(i+1)}</div><div class="v">${hasMean?sig(v):("+"+sig(v))}${u}</div></div>`).join("");
+
+  // table
+  const ns=[...new Set([4,6,8,10,12,15,20,25,30,40,I.n])].filter(v=>v>=2).sort((a,b)=>a-b);
+  $("tbl").innerHTML=ns.map(n=>{
+    const a=minD_anova(I.k,n,I.sd,I.alpha,I.pw,I.pat).D, p=minD_pair(I.k,n,I.sd,I.alpha,I.pw);
+    return `<tr class="${n===I.n?"current":""}"><td>${n}${n===I.n?" (yours)":""}</td><td>${n*I.k}</td><td>${sig(a)}${u}</td><td>${hasMean?fmt(100*a/I.mean,1)+" %":"–"}</td><td>${sig(p)}${u}</td></tr>`;
+  }).join("");
+
+  // check a difference
+  const cd=+$("checkD").value;
+  if(cd>0){
+    const pw=powerForD(I.k,I.n,I.sd,I.alpha,I.pat,cd);
+    const nn=nNeeded(I.k,I.sd,I.alpha,I.pw,I.pat,cd);
+    $("checkPow").innerHTML=`With ${I.n} larvae per group, the chance of a significant ANOVA is <b>${fmt(100*pw,0)} %</b>.`;
+    $("checkN").innerHTML=isFinite(nn)
+      ? `For ${Math.round(I.pw*100)} % power you need <b>${nn} larvae per group</b> (${nn*I.k} in total).`
+      : `Not reachable with up to 2000 larvae per group.`;
+  } else { $("checkPow").textContent=""; $("checkN").textContent=""; }
+
+  drawChart(I,A.D,u);
+}
+
+/* ---------- Chart ---------- */
+function drawChart(I,Dmin,u){
+  const cv=$("chart"), dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth, H=cv.clientHeight;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  const css=getComputedStyle(document.documentElement);
+  const col=n=>css.getPropertyValue(n).trim();
+  const pad={l:52,r:16,t:12,b:44}, pw=W-pad.l-pad.r, ph=H-pad.t-pad.b;
+
+  const nList=[I.n, Math.round(I.n*1.5), I.n*2];
+  const colors=[col("--accent"),col("--c2"),col("--c3")];
+  const xmax=niceMax(Dmin*2.2);
+  const X=d=>pad.l+d/xmax*pw, Y=p=>pad.t+(1-p)*ph;
+
+  // grid + axes
+  ctx.font="12px system-ui,sans-serif"; ctx.fillStyle=col("--muted"); ctx.strokeStyle=col("--line"); ctx.lineWidth=1;
+  for(let p=0;p<=1.0001;p+=0.2){
+    ctx.beginPath(); ctx.moveTo(pad.l,Y(p)); ctx.lineTo(W-pad.r,Y(p)); ctx.stroke();
+    ctx.textAlign="right"; ctx.textBaseline="middle"; ctx.fillText(Math.round(p*100)+"%",pad.l-8,Y(p));
+  }
+  const step=niceStep(xmax/6);
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  for(let d=0; d<=xmax+1e-9; d+=step){ ctx.fillText(sig(d),X(d),H-pad.b+8); }
+  ctx.fillText("True difference between lightest and heaviest group"+(u?` (${u.trim()})`:""), pad.l+pw/2, H-18);
+
+  // target power line
+  ctx.setLineDash([5,4]); ctx.strokeStyle="#999";
+  ctx.beginPath(); ctx.moveTo(pad.l,Y(I.pw)); ctx.lineTo(W-pad.r,Y(I.pw)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(X(Dmin),Y(0)); ctx.lineTo(X(Dmin),Y(I.pw)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // curves
+  nList.forEach((n,idx)=>{
+    ctx.strokeStyle=colors[idx]; ctx.lineWidth=idx===0?3:2; ctx.beginPath();
+    const steps=80;
+    for(let s=0;s<=steps;s++){
+      const d=xmax*s/steps, p=powerForD(I.k,n,I.sd,I.alpha,I.pat,d);
+      s?ctx.lineTo(X(d),Y(p)):ctx.moveTo(X(d),Y(p));
+    }
+    ctx.stroke();
+  });
+  // marker
+  ctx.fillStyle=colors[0]; ctx.beginPath(); ctx.arc(X(Dmin),Y(I.pw),5,0,2*Math.PI); ctx.fill();
+  ctx.fillStyle=col("--ink"); ctx.textAlign="left"; ctx.textBaseline="bottom";
+  ctx.fillText(sig(Dmin)+u, X(Dmin)+8, Y(I.pw)-4);
+
+  $("legend").innerHTML=nList.map((n,i)=>`<span style="--c:${colors[i]}">${n} larvae per group${i===0?" (yours)":""}</span>`).join("")
+    + `<span style="--c:#999">target power ${Math.round(I.pw*100)} %</span>`;
+}
+function niceStep(x){ const p=Math.pow(10,Math.floor(Math.log10(x))), m=x/p; return (m<1.5?1:m<3?2:m<7?5:10)*p; }
+function niceMax(x){ const s=niceStep(x/5); return Math.ceil(x/s)*s; }
+
+/* ---------- Pilot data ---------- */
+$("usePilot").addEventListener("click",()=>{
+  const groups=$("pilot").value.split(/\n+/).map(l=>{
+    // "18.2, 21.0" → commas separate values; "18,2 21,0" → commas are decimal marks
+    const dotDecimals=/\d\.\d/.test(l);
+    const parts=dotDecimals?l.split(/[\s,;]+/):l.split(/[\s;]+/).map(s=>s.replace(",","."));
+    return parts.filter(s=>s.trim()!=="").map(Number).filter(v=>isFinite(v));
+  }).filter(g=>g.length>=2);
+  if(!groups.length){ $("pilotMsg").textContent="Need at least one line with 2+ numbers."; return; }
+  let ss=0,df=0;
+  groups.forEach(g=>{ const m=g.reduce((a,b)=>a+b,0)/g.length; ss+=g.reduce((a,b)=>a+(b-m)**2,0); df+=g.length-1; });
+  const sd=Math.sqrt(ss/df), m0=groups[0].reduce((a,b)=>a+b,0)/groups[0].length;
+  $("sd").value=+sd.toPrecision(4); $("mean").value=+m0.toPrecision(4);
+  $("pilotMsg").textContent=`Pooled SD = ${sd.toPrecision(4)} from ${groups.length} group(s), ${df+groups.length} values; control mean = ${m0.toPrecision(4)}.`;
+  update();
+});
+
+["k","n","sd","unit","mean","alpha","power","pattern","checkD"].forEach(id=>$(id).addEventListener("input",update));
+window.addEventListener("resize",()=>update());
+update();
+
+// expose for testing
+window.__pa={powerF,solveLambda,minD_anova,minD_pair,powerForD,nNeeded};
+</script>
+</body>
+</html>
