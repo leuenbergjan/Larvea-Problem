@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Larva weight – power analysis</title>
+<style>
+  :root{
+    --bg:#f6f5f1; --card:#ffffff; --ink:#1f2328; --muted:#5d6670; --line:#e2e0d9;
+    --accent:#2f6f5e; --accent-soft:#e3efe9; --warn:#a15c00; --c2:#b5651d; --c3:#5b5fa8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{max-width:1000px;margin:0 auto;padding:32px 20px 8px}
+  h1{font-size:1.7rem;margin:0 0 6px;letter-spacing:-.01em}
+  header p{margin:0;color:var(--muted);max-width:70ch}
+  .share{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+  .share input{max-width:420px;font-size:.8rem;padding:6px 8px}
+  main{max-width:1000px;margin:0 auto;padding:12px 20px 60px;display:grid;gap:18px;
+    grid-template-columns:minmax(0,1fr) minmax(0,1.35fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .full{grid-column:1/-1}
+  h2{font-size:1.05rem;margin:0 0 14px}
+  label{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+  .field{margin-bottom:14px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}
+  input,select,textarea{width:100%;font:inherit;padding:8px 10px;border:1px solid #cfccc3;border-radius:8px;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+  textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;min-height:84px}
+  button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+  button.secondary{background:#fff;color:var(--accent)}
+  button.help{flex:none;width:20px;height:20px;padding:0;border-radius:50%;font-size:.75rem;font-weight:700;line-height:18px;
+    background:#fff;color:var(--accent);border:1px solid var(--accent)}
+  button.help[aria-expanded="true"]{background:var(--accent);color:#fff}
+  .helptext{font-size:.82rem;background:#fbfaf6;border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:6px;padding:8px 10px;margin:2px 0 8px;color:#333}
+  details{margin-top:4px}
+  summary{cursor:pointer;color:var(--accent);font-size:.9rem}
+  .hint{font-size:.8rem;color:var(--muted);margin-top:4px}
+  .big{font-size:2.3rem;font-weight:700;color:var(--accent);line-height:1.1;margin:4px 0}
+  .headline{background:var(--accent-soft);border-radius:10px;padding:16px;margin-bottom:16px}
+  .headline p{margin:0}
+  .headline .start{margin-top:8px;font-size:.92rem}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .stat{border:1px solid var(--line);border-radius:10px;padding:10px}
+  .stat .k{font-size:.75rem;color:var(--muted)}
+  .stat .v{font-size:1.15rem;font-weight:650}
+  table{width:100%;border-collapse:collapse;font-size:.9rem;font-variant-numeric:tabular-nums}
+  th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  th{font-weight:600;color:var(--muted);font-size:.8rem}
+  tr.current td{background:var(--accent-soft);font-weight:650}
+  .means{display:flex;gap:8px;flex-wrap:wrap}
+  .mean{flex:1;min-width:90px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center}
+  .mean .k{font-size:.75rem;color:var(--muted)}
+  .mean .v{font-weight:650;font-variant-numeric:tabular-nums}
+  .chart-wrap{position:relative}
+  canvas{width:100%;height:320px;display:block;touch-action:pan-y}
+  .tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:8px;
+    box-shadow:0 4px 14px rgba(0,0,0,.08);padding:8px 10px;font-size:.82rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .tip .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--muted);margin-top:8px}
+  .legend span::before{content:"";display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle;background:var(--c)}
+  .warn{color:var(--warn);font-size:.85rem}
+  .notes{font-size:.92rem;color:#333}
+  .notes li{margin-bottom:6px}
+  .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:24px}
+  .meanInputs{display:grid;grid-template-columns:1fr;gap:0}
+  .inline-result{font-size:1.02rem;margin-bottom:8px}
+  .inline-result b{color:var(--accent)}
+  .overall{background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin-top:12px}
+  @media (max-width:820px){main{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>How big a weight difference can my larva experiment detect?</h1>
+  <p>Power analysis for comparing mean larval weight between groups with a one-way ANOVA
+     plus Bonferroni-corrected follow-up comparisons. Change any value and every result updates.</p>
+  <div class="share">
+    <button id="copyLink" type="button" class="secondary">Copy link to this scenario</button>
+    <span id="copyMsg" class="hint" style="margin:0"></span>
+    <input id="linkBox" type="text" readonly hidden aria-label="Link to this scenario">
+  </div>
+</header>
+
+<main>
+  <!-- INPUTS -->
+  <section class="card">
+    <h2>1 · Your design</h2>
+    <div class="row">
+      <div class="field">
+        <label for="k">Number of groups</label>
+        <input id="k" type="number" min="2" max="12" step="1" value="3">
+      </div>
+      <div class="field">
+        <label for="n">Larvae weighed per group
+          <button type="button" class="help" data-help="help-n" aria-expanded="false" aria-label="Explain larvae per group">?</button></label>
+        <input id="n" type="number" min="2" max="1000" step="1" value="8">
+      </div>
+    </div>
+    <div class="helptext" id="help-n" hidden>The number of larvae per group that you will actually <b>weigh at the end</b>.
+      Losses go in the dropout field below, and the page then tells you how many to start with.</div>
+
+    <div class="field">
+      <label for="drop">Expected losses (death, early pupation, escape) in %
+        <button type="button" class="help" data-help="help-drop" aria-expanded="false" aria-label="Explain expected losses">?</button></label>
+      <input id="drop" type="number" min="0" max="90" step="1" value="0">
+      <div class="helptext" id="help-drop" hidden>If you expect, say, 15 % of larvae to die or pupate before weighing, enter 15.
+        The page then tells you how many larvae to <b>start</b> with so that enough are left to weigh.</div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="sd">Standard deviation (SD) of weight
+          <button type="button" class="help" data-help="help-sd" aria-expanded="false" aria-label="Explain standard deviation">?</button></label>
+        <input id="sd" type="number" min="0" step="any" value="2">
+      </div>
+      <div class="field">
+        <label for="unit">Unit</label>
+        <input id="unit" type="text" value="mg">
+      </div>
+    </div>
+    <div class="helptext" id="help-sd" hidden>
+      How much larvae in the <b>same group</b> naturally differ from their group's average.
+      Example: weights 18, 19, 20, 20, 21, 21, 22, 24 mg → average 20.6 mg, typical distance from it ≈ 1.85 mg, so SD ≈ 1.85.
+      <br>Where to get it: weigh some pilot larvae (paste them below, or use <code>=STDEV.S()</code> in Excel), or take it from a paper
+      reporting “mean ± SD”. If the paper gives SE instead, SD = SE × √n.
+      The smaller the SD, the smaller the difference you can detect.
+    </div>
+
+    <div class="field">
+      <label for="mean">Mean weight of control group (optional, for %)</label>
+      <input id="mean" type="number" min="0" step="any" value="20">
+      <div class="hint">The SD and mean above are example values. Replace them with your own (pilot data or literature).</div>
+    </div>
+
+    <details>
+      <summary>Don't know the SD? Paste pilot weights</summary>
+      <div class="field" style="margin-top:10px">
+        <label for="pilot">One group per line, values separated by spaces, commas or semicolons. First line = control.</label>
+        <textarea id="pilot" placeholder="18.2 21.0 19.5 22.3 17.8 20.1&#10;23.1 24.0 21.7 25.2 22.8 23.9"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <button id="usePilot" type="button">Use pooled SD</button>
+          <span id="pilotMsg" class="hint"></span>
+        </div>
+      </div>
+    </details>
+
+    <div class="row" style="margin-top:14px">
+      <div class="field">
+        <label for="alpha">Significance level α
+          <button type="button" class="help" data-help="help-alpha" aria-expanded="false" aria-label="Explain significance level">?</button></label>
+        <select id="alpha">
+          <option value="0.05" selected>0.05</option>
+          <option value="0.01">0.01</option>
+          <option value="0.10">0.10</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="power">Desired power
+          <button type="button" class="help" data-help="help-power" aria-expanded="false" aria-label="Explain power">?</button></label>
+        <select id="power">
+          <option value="0.80" selected>80 %</option>
+          <option value="0.90">90 %</option>
+          <option value="0.95">95 %</option>
+          <option value="0.70">70 %</option>
+        </select>
+      </div>
+    </div>
+    <div class="helptext" id="help-alpha" hidden>The p-value below which you call a result significant. 0.05 is the usual choice.</div>
+    <div class="helptext" id="help-power" hidden>The chance that your experiment gives a significant result <i>if the effect is real</i> and as big as shown.
+      80 % is the usual minimum, so 1 in 5 such experiments would still miss the effect. 90 % is safer.</div>
+
+    <div class="field">
+      <label for="cmp">Follow-up comparisons after the ANOVA
+        <button type="button" class="help" data-help="help-cmp" aria-expanded="false" aria-label="Explain comparisons">?</button></label>
+      <select id="cmp">
+        <option value="control" selected>Each treatment vs control only</option>
+        <option value="all">All pairs of groups</option>
+      </select>
+      <div class="helptext" id="help-cmp" hidden>After a significant ANOVA you test which groups differ. Every extra test makes the correction stricter.
+        With 3 groups, “vs control” is 2 tests (control–A, control–B) and “all pairs” is 3 (adds A–B).
+        Only choose “vs control” if you won't compare the treatments with each other, and decide this <b>before</b> the experiment.
+        The page uses Bonferroni. Dunnett's test (vs control) and Tukey's test (all pairs) are slightly more powerful, so the real numbers are a little better than shown.</div>
+    </div>
+
+    <div class="field">
+      <label for="pattern">How do you expect the groups to differ?</label>
+      <select id="pattern">
+        <option value="one" selected>One group differs, the others are equal</option>
+        <option value="even">Evenly spaced (e.g. dose–response)</option>
+        <option value="extreme">Two extreme groups, the rest in the middle (hardest case)</option>
+      </select>
+      <div class="hint">“Difference” in sections 2, 3 and 5 means the gap between the lightest and heaviest group mean.
+        For your own expected values, use section 4.</div>
+    </div>
+  </section>
+
+  <!-- MAIN RESULT -->
+  <section class="card">
+    <h2>2 · Smallest difference you can reliably detect</h2>
+    <div class="headline">
+      <p>With <b id="hDesign"></b>, the group means must differ by at least</p>
+      <div class="big" id="hD">–</div>
+      <p id="hSub"></p>
+      <p class="start" id="hStart"></p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">Difference in SD units (Cohen's d)</div><div class="v" id="sD">–</div></div>
+      <div class="stat"><div class="k">ANOVA effect size f</div><div class="v" id="sF">–</div></div>
+      <div class="stat"><div class="k" id="sPairLbl">Follow-up comparison</div><div class="v" id="sPair">–</div></div>
+    </div>
+
+    <label>Example group means that would just reach the target power</label>
+    <div class="means" id="means"></div>
+    <p class="hint" id="pairHint" style="margin-top:12px"></p>
+  </section>
+
+  <!-- POWER CURVE -->
+  <section class="card full">
+    <h2>3 · Power curve: chance of a significant ANOVA for each true difference</h2>
+    <div class="chart-wrap">
+      <canvas id="chart" aria-label="Power curve"></canvas>
+      <div id="tip" class="tip" hidden></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="hint">Hover over (or touch) the chart to read the exact power.</div>
+  </section>
+
+  <!-- EXPECTED MEANS -->
+  <section class="card full">
+    <h2>4 · Check the group means you expect</h2>
+    <div class="split">
+      <div>
+        <div class="meanInputs" id="expMeans"></div>
+        <div class="hint">Enter your best guess for each group's average weight (<span class="unitLbl">mg</span>), e.g. from pilot data or a paper.</div>
+      </div>
+      <div>
+        <div class="inline-result" id="expAnova"></div>
+        <table>
+          <thead><tr><th>Comparison</th><th>Difference</th><th>Power now</th><th>Larvae needed / group</th><th>Start with</th></tr></thead>
+          <tbody id="expPairs"></tbody>
+        </table>
+        <div class="overall" id="expOverall"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TABLE -->
+  <section class="card full">
+    <h2>5 · What if I use more larvae?</h2>
+    <table>
+      <thead><tr><th>Larvae weighed / group</th><th>Start with / group</th><th>Total to start</th>
+        <th>Min. difference (ANOVA)</th><th>% of mean</th><th id="tblPairHead">Min. diff. (follow-up)</th></tr></thead>
+      <tbody id="tbl"></tbody>
+    </table>
+  </section>
+
+  <!-- NOTES -->
+  <section class="card full notes">
+    <h2>How this works &amp; caveats</h2>
+    <ul>
+      <li><b>Test assumed:</b> one-way ANOVA on weight, groups of equal size, normally distributed weights with the same SD in every group. Power is computed exactly from the noncentral F distribution (the same method G*Power uses).</li>
+      <li><b>Effect size:</b> Cohen's <i>f</i> = SD of the group means ÷ within-group SD. The “pattern” setting converts <i>f</i> into an actual max–min weight difference.</li>
+      <li><b>Follow-up comparisons:</b> t-tests using the pooled error from the ANOVA, with α divided by the number of comparisons (Bonferroni).
+        Dunnett's test (vs control) and Tukey's test (all pairs) are slightly less strict, so these numbers err on the safe side.</li>
+      <li><b>The SD drives everything.</b> Halving the SD halves the detectable difference, while doubling the sample size only shrinks it by about 30 %.
+        Reducing variation (same instar, same age, same weighing time) is often the cheapest way to gain power.</li>
+      <li>If you plan a non-parametric test (Kruskal–Wallis), expect to need about 15 % more larvae for the same power.</li>
+      <li><b>Independence:</b> if all larvae of one group share a container, the containers rather than the larvae may be the real replicates. Check this with your supervisor.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+/* ---------- Distribution functions ---------- */
+function lgamma(x){
+  const g=7,c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+    -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(x<0.5) return Math.log(Math.PI/Math.abs(Math.sin(Math.PI*x)))-lgamma(1-x);
+  x-=1; let a=c[0]; const t=x+g+0.5;
+  for(let i=1;i<9;i++) a+=c[i]/(x+i);
+  return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a);
+}
+function betacf(a,b,x){
+  const MAXIT=500,EPS=1e-15,FPMIN=1e-300;
+  const qab=a+b,qap=a+1,qam=a-1;
+  let c=1,d=1-qab*x/qap; if(Math.abs(d)<FPMIN)d=FPMIN; d=1/d; let h=d;
+  for(let m=1;m<=MAXIT;m++){
+    const m2=2*m;
+    let aa=m*(b-m)*x/((qam+m2)*(a+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN; c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+    d=1/d; h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN; c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+    d=1/d; const del=d*c; h*=del;
+    if(Math.abs(del-1)<EPS) break;
+  }
+  return h;
+}
+function ibeta(x,a,b){ // regularized incomplete beta I_x(a,b)
+  if(x<=0) return 0; if(x>=1) return 1;
+  const bt=Math.exp(lgamma(a+b)-lgamma(a)-lgamma(b)+a*Math.log(x)+b*Math.log(1-x));
+  if(x<(a+1)/(a+b+2)) return bt*betacf(a,b,x)/a;
+  return 1-bt*betacf(b,a,1-x)/b;
+}
+function fcdf(f,d1,d2){ if(f<=0) return 0; return ibeta(d1*f/(d1*f+d2),d1/2,d2/2); }
+const finvCache=new Map();
+function finv(p,d1,d2){
+  const key=p+"|"+d1+"|"+d2; if(finvCache.has(key)) return finvCache.get(key);
+  let lo=0,hi=1; while(fcdf(hi,d1,d2)<p) hi*=2;
+  for(let i=0;i<100;i++){ const mid=(lo+hi)/2; if(fcdf(mid,d1,d2)<p) lo=mid; else hi=mid; }
+  const r=(lo+hi)/2; finvCache.set(key,r); return r;
+}
+function ncfcdf(f,d1,d2,lam){ // noncentral F CDF as Poisson mixture
+  if(lam<=0) return fcdf(f,d1,d2);
+  const x=d1*f/(d1*f+d2), h=lam/2;
+  const jmax=Math.ceil(h+12*Math.sqrt(h)+30);
+  let s=0;
+  for(let j=0;j<=jmax;j++){
+    const w=Math.exp(-h+j*Math.log(h)-lgamma(j+1));
+    if(w<1e-16 && j>h) break;
+    s+=w*ibeta(x,d1/2+j,d2/2);
+  }
+  return Math.min(1,s);
+}
+function powerF(lam,d1,d2,alpha){ return 1-ncfcdf(finv(1-alpha,d1,d2),d1,d2,lam); }
+function solveLambda(d1,d2,alpha,target){
+  let lo=0,hi=1; while(powerF(hi,d1,d2,alpha)<target && hi<1e6) hi*=2;
+  for(let i=0;i<60;i++){ const mid=(lo+hi)/2; if(powerF(mid,d1,d2,alpha)<target) lo=mid; else hi=mid; }
+  return (lo+hi)/2;
+}
+
+/* ---------- Design helpers ---------- */
+// number of follow-up comparisons
+function nComparisons(k,cmp){ return cmp==="control"?k-1:k*(k-1)/2; }
+// larvae to start with, given the fraction lost
+function startN(n,drop){ return Math.ceil(n/(1-drop)-1e-9); }
+// SD of group means = c * D  (D = max - min difference)
+function patternFactor(p,k){
+  if(p==="one") return Math.sqrt(k-1)/k;
+  if(p==="extreme") return Math.sqrt(1/(2*k));
+  return Math.sqrt((k*k-1)/12)/(k-1); // evenly spaced
+}
+function exampleMeans(p,k,M,D){
+  const out=[];
+  for(let i=0;i<k;i++){
+    if(p==="one") out.push(i===k-1?M+D:M);
+    else if(p==="extreme") out.push(i===0?M:(i===k-1?M+D:M+D/2));
+    else out.push(M+i*D/(k-1));
+  }
+  return out;
+}
+// ANOVA power for effect size f
+function powerAnovaF(k,n,f,alpha){ return powerF(f*f*k*n,k-1,k*n-k,alpha); }
+// power of one Bonferroni follow-up t-test (pooled error df) for a mean difference diff
+function powerPair(k,n,sd,alpha,m,diff){ const d=diff/sd; return powerF(n/2*d*d,1,k*n-k,alpha/m); }
+// minimum detectable max-min difference for ANOVA
+function minD_anova(k,n,sd,alpha,pw,pat){
+  const lam=solveLambda(k-1,k*n-k,alpha,pw);
+  const f=Math.sqrt(lam/(k*n));
+  return {f, D:f*sd/patternFactor(pat,k)};
+}
+// minimum detectable difference for one Bonferroni follow-up comparison
+function minD_pair(k,n,sd,alpha,pw,m){
+  const lam=solveLambda(1,k*n-k,alpha/m,pw);
+  return sd*Math.sqrt(2*lam/n);
+}
+function powerForD(k,n,sd,alpha,pat,D){ return powerAnovaF(k,n,patternFactor(pat,k)*D/sd,alpha); }
+// smallest n (2..2000) for which ok(n) is true; Infinity if none
+function smallestN(ok){
+  if(ok(2)) return 2;
+  if(!ok(2000)) return Infinity;
+  let lo=2,hi=2000;
+  while(hi-lo>1){ const mid=Math.floor((lo+hi)/2); if(ok(mid)) hi=mid; else lo=mid; }
+  return hi;
+}
+function expectedMeansAnalysis(means,sd,n,alpha,pw,cmp){
+  const k=means.length, gm=means.reduce((a,b)=>a+b,0)/k;
+  const f=Math.sqrt(means.reduce((a,v)=>a+(v-gm)**2,0)/k)/sd;
+  const anova={f, power:powerAnovaF(k,n,f,alpha), nNeed: f>0?smallestN(nn=>powerAnovaF(k,nn,f,alpha)>=pw):Infinity};
+  const m=nComparisons(k,cmp), pairs=[];
+  for(let i=0;i<k;i++) for(let j=i+1;j<k;j++){
+    if(cmp==="control" && i!==0) continue;
+    const diff=means[j]-means[i], ad=Math.abs(diff);
+    pairs.push({i,j,diff,power:powerPair(k,n,sd,alpha,m,ad),
+      nNeed: ad>0?smallestN(nn=>powerPair(k,nn,sd,alpha,m,ad)>=pw):Infinity});
+  }
+  return {anova,pairs,m};
+}
+
+/* ---------- UI ---------- */
+const $=id=>document.getElementById(id);
+function fmt(x,d=2){ if(!isFinite(x)) return "–"; return x.toLocaleString(undefined,{maximumFractionDigits:d,minimumFractionDigits:d}); }
+function sig(x){ if(!isFinite(x)) return "–"; const a=Math.abs(x); return fmt(x, a>=100?0:a>=10?1:2); }
+function pct(p){ return fmt(100*p,0)+" %"; }
+function groupName(i){ return i===0?"Control":"Group "+(i+1); }
+function readInputs(){
+  return {
+    k:Math.max(2,Math.min(12,Math.round(+$("k").value||3))),
+    n:Math.max(2,Math.min(1000,Math.round(+$("n").value||8))),
+    drop:Math.max(0,Math.min(90,+$("drop").value||0))/100,
+    sd:+$("sd").value, mean:+$("mean").value,
+    unit:$("unit").value.trim(),
+    alpha:+$("alpha").value, pw:+$("power").value,
+    pat:$("pattern").value, cmp:$("cmp").value
+  };
+}
+const patternText={one:"one group and the others",even:"the lightest and heaviest group (evenly spaced)",extreme:"the lightest and heaviest group"};
+const cmpText={control:"each treatment vs control",all:"all pairs"};
+
+/* expected-means inputs: one per group, rebuilt when the number of groups changes */
+function buildMeanInputs(k,preset){
+  const box=$("expMeans");
+  const old=[...box.querySelectorAll("input")].map(e=>e.value);
+  const M=+$("mean").value>0?+$("mean").value:20;
+  let html="";
+  for(let i=0;i<k;i++){
+    let v;
+    if(preset && preset[i]!=null && isFinite(preset[i])) v=preset[i];
+    else if(old[i]!==undefined && old[i]!=="") v=old[i];
+    else v=+(M*(1+0.1*i)).toPrecision(4);
+    html+=`<div class="field"><label for="em${i}">${i===0?"Group 1 (control)":"Group "+(i+1)}</label>
+      <input id="em${i}" class="em" type="number" step="any" value="${v}"></div>`;
+  }
+  box.innerHTML=html;
+  box.querySelectorAll("input").forEach(e=>e.addEventListener("input",update));
+}
+function readMeans(){ return [...document.querySelectorAll("#expMeans input")].map(e=>e.value===""?NaN:+e.value); }
+
+function update(){
+  const I=readInputs(), u=I.unit?(" "+I.unit):"";
+  if(document.querySelectorAll("#expMeans input").length!==I.k) buildMeanInputs(I.k);
+  saveToURL();
+  document.querySelectorAll(".unitLbl").forEach(e=>e.textContent=I.unit||"units");
+  if(!(I.sd>0)){
+    $("hD").textContent="–"; $("hStart").textContent="";
+    $("hSub").innerHTML='<span class="warn">Enter a standard deviation greater than 0.</span>'; return;
+  }
+  const m=nComparisons(I.k,I.cmp);
+  const A=minD_anova(I.k,I.n,I.sd,I.alpha,I.pw,I.pat);
+  const P=minD_pair(I.k,I.n,I.sd,I.alpha,I.pw,m);
+  const hasMean=I.mean>0;
+  const st=n=>startN(n,I.drop);
+
+  // section 2
+  $("hDesign").textContent=`${I.k} groups × ${I.n} larvae`;
+  $("hD").textContent=sig(A.D)+u;
+  $("hSub").innerHTML=`between ${patternText[I.pat]}${hasMean?` (≈ ${fmt(100*A.D/I.mean,1)} % of the control mean)`:""}
+    to get a significant ANOVA (p &lt; ${I.alpha}) in ${Math.round(I.pw*100)} % of experiments.`;
+  $("hStart").innerHTML=I.drop>0
+    ? `With ${fmt(I.drop*100,0)} % losses, <b>start with ${st(I.n)} larvae per group</b> (${st(I.n)*I.k} in total) so that about ${I.n} per group are left to weigh.`
+    : "";
+  $("sD").textContent=fmt(A.D/I.sd,2);
+  $("sF").textContent=fmt(A.f,3);
+  $("sPairLbl").textContent=`Follow-up: ${cmpText[I.cmp]}`;
+  $("sPair").textContent=sig(P)+u;
+  $("pairHint").innerHTML=`To show that ${I.cmp==="control"?"a treatment differs from the control":"two <i>specific</i> groups differ"}
+    in a follow-up test (${m} comparison${m>1?"s":""}, Bonferroni α = ${I.alpha}/${m}),
+    the two means need to be about <b>${sig(P)}${u}</b> apart${hasMean?` (${fmt(100*P/I.mean,1)} % of the control mean)`:""}.`;
+  const M=hasMean?I.mean:0;
+  $("means").innerHTML=exampleMeans(I.pat,I.k,M,A.D).map((v,i)=>
+    `<div class="mean"><div class="k">${i===0?"Group 1 (control)":"Group "+(i+1)}</div><div class="v">${hasMean?sig(v):("+"+sig(v))}${u}</div></div>`).join("");
+
+  // section 4: expected means
+  renderExpected(I,u,m);
+
+  // section 5: table
+  $("tblPairHead").textContent=`Min. diff. (${cmpText[I.cmp]})`;
+  const ns=[...new Set([4,6,8,10,12,15,20,25,30,40,I.n])].filter(v=>v>=2).sort((a,b)=>a-b);
+  $("tbl").innerHTML=ns.map(n=>{
+    const a=minD_anova(I.k,n,I.sd,I.alpha,I.pw,I.pat).D, p=minD_pair(I.k,n,I.sd,I.alpha,I.pw,m);
+    return `<tr class="${n===I.n?"current":""}"><td>${n}${n===I.n?" (yours)":""}</td><td>${st(n)}</td><td>${st(n)*I.k}</td>
+      <td>${sig(a)}${u}</td><td>${hasMean?fmt(100*a/I.mean,1)+" %":"–"}</td><td>${sig(p)}${u}</td></tr>`;
+  }).join("");
+
+  // section 3: chart (compute once, redraw cheaply on hover/resize)
+  computeCurves(I,A.D,u);
+  renderChart();
+}
+
+function renderExpected(I,u,m){
+  const means=readMeans();
+  if(means.some(v=>!isFinite(v))){
+    $("expAnova").innerHTML='<span class="warn">Fill in a mean for every group.</span>';
+    $("expPairs").innerHTML=""; $("expOverall").innerHTML=""; return;
+  }
+  const R=expectedMeansAnalysis(means,I.sd,I.n,I.alpha,I.pw,I.cmp);
+  const st=n=>isFinite(n)?startN(n,I.drop):"–";
+  const nTxt=n=>isFinite(n)?n:(n===Infinity?"> 2000":"–");
+  if(R.anova.f===0){
+    $("expAnova").innerHTML="All groups have the same mean, so there is no difference to detect.";
+  } else {
+    $("expAnova").innerHTML=`ANOVA with ${I.n} larvae per group: power <b>${pct(R.anova.power)}</b> (effect size f = ${fmt(R.anova.f,2)}).
+      For ${Math.round(I.pw*100)} % you need <b>${nTxt(R.anova.nNeed)} per group</b>${isFinite(R.anova.nNeed)&&I.drop>0?` (start with ${st(R.anova.nNeed)})`:""}.`;
+  }
+  $("expPairs").innerHTML=R.pairs.map(p=>{
+    const none=p.diff===0;
+    return `<tr><td>${groupName(p.i)} vs ${groupName(p.j)}</td><td>${p.diff>0?"+":""}${sig(p.diff)}${u}</td>
+      <td>${none?"–":pct(p.power)}</td><td>${none?"no difference":nTxt(p.nNeed)}</td><td>${none?"–":st(p.nNeed)}</td></tr>`;
+  }).join("");
+  // overall requirement: ANOVA + every comparison that has a real difference
+  const needs=[R.anova.f>0?R.anova.nNeed:null, ...R.pairs.filter(p=>p.diff!==0).map(p=>p.nNeed)].filter(v=>v!==null);
+  if(!needs.length){ $("expOverall").innerHTML=""; return; }
+  const worst=Math.max(...needs);
+  $("expOverall").innerHTML=isFinite(worst)
+    ? `To have ${Math.round(I.pw*100)} % power for the ANOVA <i>and</i> every comparison with an expected difference:
+       <b>${worst} larvae weighed per group</b>${I.drop>0?`, so <b>start with ${st(worst)} per group</b> (${st(worst)*I.k} in total)`:` (${worst*I.k} in total)`}.`
+    : `At least one expected difference is too small to detect with up to 2000 larvae per group.`;
+}
+
+/* ---------- Chart ---------- */
+let chart=null; // cached curve data + layout
+function computeCurves(I,Dmin,u){
+  const nList=[I.n, Math.round(I.n*1.5), I.n*2];
+  const xmax=niceMax(Dmin*2.2), steps=80;
+  const curves=nList.map(n=>{
+    const pts=[]; for(let s=0;s<=steps;s++){ const d=xmax*s/steps; pts.push([d,powerForD(I.k,n,I.sd,I.alpha,I.pat,d)]); }
+    return {n,pts};
+  });
+  chart={I,Dmin,u,xmax,curves,nList,hover:null};
+  const css=getComputedStyle(document.documentElement), col=v=>css.getPropertyValue(v).trim();
+  chart.colors=[col("--accent"),col("--c2"),col("--c3")];
+  $("legend").innerHTML=nList.map((n,i)=>`<span style="--c:${chart.colors[i]}">${n} larvae per group${i===0?" (yours)":""}</span>`).join("")
+    + `<span style="--c:#999">target power ${Math.round(I.pw*100)} %</span>`;
+}
+function layout(){
+  const cv=$("chart"), W=cv.clientWidth, H=cv.clientHeight, pad={l:52,r:16,t:12,b:44};
+  return {cv,W,H,pad,pw:W-pad.l-pad.r,ph:H-pad.t-pad.b};
+}
+function renderChart(){
+  if(!chart) return;
+  const {cv,W,H,pad,pw,ph}=layout(), dpr=window.devicePixelRatio||1;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  const css=getComputedStyle(document.documentElement), col=v=>css.getPropertyValue(v).trim();
+  const {I,Dmin,u,xmax,curves,colors}=chart;
+  const X=d=>pad.l+d/xmax*pw, Y=p=>pad.t+(1-p)*ph;
+
+  ctx.font="12px system-ui,sans-serif"; ctx.fillStyle=col("--muted"); ctx.strokeStyle=col("--line"); ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){ const p=i/5;
+    ctx.beginPath(); ctx.moveTo(pad.l,Y(p)); ctx.lineTo(W-pad.r,Y(p)); ctx.stroke();
+    ctx.textAlign="right"; ctx.textBaseline="middle"; ctx.fillText(Math.round(p*100)+"%",pad.l-8,Y(p));
+  }
+  const step=niceStep(xmax/6);
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  for(let d=0; d<=xmax+1e-9; d+=step) ctx.fillText(sig(d),X(d),H-pad.b+8);
+  ctx.fillText("True difference between lightest and heaviest group"+(u?` (${u.trim()})`:""), pad.l+pw/2, H-18);
+
+  ctx.setLineDash([5,4]); ctx.strokeStyle="#999";
+  ctx.beginPath(); ctx.moveTo(pad.l,Y(I.pw)); ctx.lineTo(W-pad.r,Y(I.pw)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(X(Dmin),Y(0)); ctx.lineTo(X(Dmin),Y(I.pw)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  curves.forEach((c,idx)=>{
+    ctx.strokeStyle=colors[idx]; ctx.lineWidth=idx===0?3:2; ctx.beginPath();
+    c.pts.forEach(([d,p],s)=> s?ctx.lineTo(X(d),Y(p)):ctx.moveTo(X(d),Y(p)));
+    ctx.stroke();
+  });
+  ctx.fillStyle=colors[0]; ctx.beginPath(); ctx.arc(X(Dmin),Y(I.pw),5,0,2*Math.PI); ctx.fill();
+  ctx.fillStyle=col("--ink"); ctx.textAlign="left"; ctx.textBaseline="bottom";
+  ctx.fillText(sig(Dmin)+u, X(Dmin)+8, Y(I.pw)-4);
+
+  // hover crosshair + exact values
+  const tip=$("tip");
+  if(chart.hover==null){ tip.hidden=true; return; }
+  const d=chart.hover, x=X(d);
+  ctx.strokeStyle="#555"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,pad.t+ph); ctx.stroke();
+  const vals=chart.nList.map(n=>powerForD(I.k,n,I.sd,I.alpha,I.pat,d));
+  vals.forEach((p,i)=>{ ctx.fillStyle=colors[i]; ctx.beginPath(); ctx.arc(x,Y(p),4,0,2*Math.PI); ctx.fill(); });
+  const hasMean=I.mean>0;
+  tip.innerHTML=`<b>Difference ${sig(d)}${u}</b>${hasMean?` (${fmt(100*d/I.mean,1)} % of mean)`:""}<br>`+
+    chart.nList.map((n,i)=>`<span class="dot" style="background:${colors[i]}"></span>${n} per group: <b>${pct(vals[i])}</b>`).join("<br>");
+  tip.hidden=false;
+  const tw=tip.offsetWidth, left = x+12+tw > W ? x-12-tw : x+12;
+  tip.style.left=left+"px"; tip.style.top=(pad.t+8)+"px";
+}
+function niceStep(x){ const p=Math.pow(10,Math.floor(Math.log10(x))), m=x/p; return (m<1.5?1:m<3?2:m<7?5:10)*p; }
+function niceMax(x){ const s=niceStep(x/5); return Math.ceil(x/s)*s; }
+
+$("chart").addEventListener("pointermove",e=>{
+  if(!chart) return;
+  const {pad,pw}=layout(), rect=$("chart").getBoundingClientRect();
+  const px=e.clientX-rect.left;
+  if(px<pad.l || px>pad.l+pw){ chart.hover=null; } else chart.hover=(px-pad.l)/pw*chart.xmax;
+  renderChart();
+});
+$("chart").addEventListener("pointerleave",()=>{ if(chart){ chart.hover=null; renderChart(); } });
+
+let resizeQueued=false;
+window.addEventListener("resize",()=>{ // only redraw the chart, no recalculation
+  if(resizeQueued) return; resizeQueued=true;
+  requestAnimationFrame(()=>{ resizeQueued=false; renderChart(); });
+});
+
+/* ---------- Help buttons ---------- */
+document.querySelectorAll("button.help").forEach(b=>b.addEventListener("click",e=>{
+  e.preventDefault();
+  const t=$(b.dataset.help), open=t.hidden;
+  t.hidden=!open; b.setAttribute("aria-expanded",String(open));
+}));
+
+/* ---------- Shareable link ---------- */
+const PARAMS=["k","n","drop","sd","unit","mean","alpha","power","cmp","pattern"];
+function loadFromURL(){
+  const q=new URLSearchParams(location.search);
+  PARAMS.forEach(p=>{
+    if(!q.has(p)) return;
+    const el=$(p), v=q.get(p);
+    if(el.tagName==="SELECT"){ if([...el.options].some(o=>o.value===v)) el.value=v; }
+    else el.value=v;
+  });
+  return q.has("m")?q.get("m").split(",").map(s=>s===""?NaN:+s):null;
+}
+function scenarioURL(){
+  const q=new URLSearchParams();
+  PARAMS.forEach(p=>q.set(p,$(p).value));
+  q.set("m",[...document.querySelectorAll("#expMeans input")].map(e=>e.value).join(","));
+  return location.origin+location.pathname+"?"+q.toString();
+}
+function saveToURL(){ try{ history.replaceState(null,"",scenarioURL()); }catch(e){} }
+$("copyLink").addEventListener("click",()=>{
+  const url=scenarioURL();
+  const fallback=()=>{ const box=$("linkBox"); box.hidden=false; box.value=url; box.select(); $("copyMsg").textContent="Copy this link:"; };
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(url).then(()=>{ $("copyMsg").textContent="Link copied. Anyone opening it sees exactly these settings."; $("linkBox").hidden=true; }, fallback);
+  } else fallback();
+});
+
+/* ---------- Pilot data ---------- */
+$("usePilot").addEventListener("click",()=>{
+  const groups=$("pilot").value.split(/\n+/).map(l=>{
+    // "18.2, 21.0" → commas separate values; "18,2 21,0" → commas are decimal marks
+    const dotDecimals=/\d\.\d/.test(l);
+    const parts=dotDecimals?l.split(/[\s,;]+/):l.split(/[\s;]+/).map(s=>s.replace(",","."));
+    return parts.filter(s=>s.trim()!=="").map(Number).filter(v=>isFinite(v));
+  }).filter(g=>g.length>=2);
+  if(!groups.length){ $("pilotMsg").textContent="Need at least one line with 2+ numbers."; return; }
+  let ss=0,df=0;
+  groups.forEach(g=>{ const m=g.reduce((a,b)=>a+b,0)/g.length; ss+=g.reduce((a,b)=>a+(b-m)**2,0); df+=g.length-1; });
+  const sd=Math.sqrt(ss/df), m0=groups[0].reduce((a,b)=>a+b,0)/groups[0].length;
+  $("sd").value=+sd.toPrecision(4); $("mean").value=+m0.toPrecision(4);
+  $("pilotMsg").textContent=`Pooled SD = ${sd.toPrecision(4)} from ${groups.length} group(s), ${df+groups.length} values; control mean = ${m0.toPrecision(4)}.`;
+  update();
+});
+
+/* ---------- Start ---------- */
+["k","n","drop","sd","unit","mean","alpha","power","pattern","cmp"].forEach(id=>$(id).addEventListener("input",update));
+const presetMeans=loadFromURL();
+buildMeanInputs(readInputs().k,presetMeans);
+update();
+</script>
+</body>
+</html>
